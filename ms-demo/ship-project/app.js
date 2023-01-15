@@ -14,7 +14,25 @@ const STOP_X = START_X + MONSTER_WIDTH;*/
 }
 
 draw_background();*/
+/*
+//some varibles to use global
+const Messages = {
+  KEY_EVENT_UP: "KEY_EVENT_UP",
+  KEY_EVENT_DOWN: "KEY_EVENT_DOWN",
+  KEY_EVENT_LEFT: "KEY_EVENT_LEFT",
+  KEY_EVENT_RIGHT: "KEY_EVENT_RIGHT",
+};
 
+let heroImg,
+  enemyImg,
+  laserImg,
+  canvas,
+  ctx,
+  gameObjects = [],
+  hero,
+  eventEmitter = new EventEmitter();
+*/
+//GameObject class
 class GameObject {
   constructor(x, y) {
     this.x = x;
@@ -31,6 +49,7 @@ class GameObject {
   }
 }
 
+//Hero class
 class Hero extends GameObject {
   constructor(x, y) {
     super(x, y);
@@ -39,6 +58,7 @@ class Hero extends GameObject {
   }
 }
 
+//Enemy class
 class Enemy extends GameObject {
   constructor(x, y) {
     super(x, y);
@@ -55,17 +75,22 @@ class Enemy extends GameObject {
   }
 }
 
+//event handler function
 let onKeyDown = function (e) {
   switch (e.keyCode) {
     case 37:
+      eventEmitter.emit(Messages.KEY_EVENT_LEFT);
       break;
     case 38:
-      e.preventDefault();
+      eventEmitter.emit(Messages.KEY_EVENT_UP);
+      //e.preventDefault();
       break;
     case 39:
+      eventEmitter.emit(Messages.KEY_EVENT_RIGHT);
       break;
     case 40:
-      e.preventDefault();
+      eventEmitter.emit(Messages.KEY_EVENT_DOWN);
+      //e.preventDefault();
       break;
     default:
       break;
@@ -83,7 +108,7 @@ window.addEventListener("keyup", (evt) => {
   } else if (evt.key === "ArrowLeft") {
     eventEmitter.emit(Messages.KEY_EVENT_LEFT);
   } else if (evt.key === "ArrowRight") {
-    eventEmitter.emit(Message.KEY_EVENT_RIGHT);
+    eventEmitter.emit(Messages.KEY_EVENT_RIGHT);
   }
 });
 
@@ -107,6 +132,24 @@ class EventEmitter {
   }
 }
 
+//some varibles to use global
+const Messages = {
+  KEY_EVENT_UP: "KEY_EVENT_UP",
+  KEY_EVENT_DOWN: "KEY_EVENT_DOWN",
+  KEY_EVENT_LEFT: "KEY_EVENT_LEFT",
+  KEY_EVENT_RIGHT: "KEY_EVENT_RIGHT",
+};
+
+let heroImg,
+  enemyImg,
+  laserImg,
+  canvas,
+  ctx,
+  gameObjects = [],
+  hero,
+  eventEmitter = new EventEmitter();
+
+//async to load img assets
 function loadAsset(path) {
   return new Promise((resolve) => {
     const img = new Image();
@@ -117,6 +160,7 @@ function loadAsset(path) {
   });
 }
 
+//createEnemies and push into gameObjects
 function createEnemies(canvas, ctx, enemyImg) {
   const MONSTER_TOTAL = 5;
   const MONSTER_WIDTH = MONSTER_TOTAL * 98;
@@ -125,17 +169,62 @@ function createEnemies(canvas, ctx, enemyImg) {
 
   for (let x = START_X; x < STOP_X; x += 98) {
     for (let y = 0; y < 50 * 5; y += 50) {
-      ctx.drawImage(enemyImg, x, y);
+      const enemy = new Enemy(x, y);
+      enemy.img = enemyImg;
+      gameObjects.push(enemy);
     }
   }
 }
 
+//create hero
+function createHero() {
+  hero = new Hero(canvas.width / 2 - 45, canvas.height - canvas.height / 4);
+  hero.img = heroImg;
+  gameObjects.push(hero);
+}
+
+//start drawing
+function drawGameObjects(ctx) {
+  gameObjects.forEach((go) => go.draw(ctx));
+}
+
+//Initialize the game
+function initGame() {
+  gameObjects = [];
+  createEnemies();
+  createHero();
+
+  eventEmitter.on(Messages.KEY_EVENT_UP, () => {
+    hero.y -= 5;
+  });
+
+  eventEmitter.on(Messages.KEY_EVENT_DOWN, () => {
+    hero.y += 5;
+  });
+
+  eventEmitter.on(Messages.KEY_EVENT_LEFT, () => {
+    hero.x -= 5;
+  });
+
+  eventEmitter.on(Messages.KEY_EVENT_RIGHT, () => {
+    hero.x += 5;
+  });
+}
+
+//Setup the game loop
 window.onload = async () => {
   canvas = document.getElementById("myCanvas");
   ctx = canvas.getContext("2d");
-  const player = await loadAsset("./assets/player.png");
-  const enemyShip = await loadAsset("./assets/enemyShip.png");
+  heroImg = await loadAsset("./assets/player.png");
+  enemyImg = await loadAsset("./assets/enemyShip.png");
 
+  initGame();
+  let gameLoopId = setInterval(() => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "black";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    drawGameObjects(ctx);
+  }, 100);
   ctx.fillStyle = "black";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(
@@ -143,10 +232,9 @@ window.onload = async () => {
     canvas.width / 2 - 45,
     canvas.height - canvas.height / 4
   );
-  createEnemies(canvas, ctx, enemyShip);
+  //createEnemies(canvas, ctx, enemyShip);
 };
 
-run();
 /*const MONSTER_TOTAL = 5;
 const MONSTER_WIDTH = MONSTER_TOTAL * 98;
 const START_X = canvas.width - MONSTER_WIDTH;
