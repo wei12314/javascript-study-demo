@@ -49,8 +49,11 @@ class Hero extends GameObject {
   constructor(x, y) {
     super(x, y);
     (this.width = 99), (this.height = 75);
-    this.type = "hero";
+    this.type = "Hero";
     this.speed = { x: 0, y: 0 };
+    this.cooldown = 0;
+    this.life = 3;
+    this.points = 0;
   }
   fire() {
     gameObjects.push(new Laser(this.x + 45, this.y - 10));
@@ -64,9 +67,20 @@ class Hero extends GameObject {
       }
     }, 200);
   }
-  /*canFire() {
+  canFire() {
     return this.cooldown === 0;
-  }*/
+  }
+
+  decrementLife() {
+    this.life--;
+    if (this.life === 0) {
+      this.dead = true;
+    }
+  }
+
+  incrementPoints() {
+    this.points += 100;
+  }
 }
 
 //Enemy class
@@ -138,10 +152,12 @@ const Messages = {
 let heroImg,
   enemyImg,
   laserImg,
+  lifeImg,
   canvas,
   ctx,
   gameObjects = [],
   hero,
+  score = 3,
   eventEmitter = new EventEmitter();
 
 // EVENTS
@@ -202,10 +218,30 @@ function drawGameObjects(ctx) {
   gameObjects.forEach((go) => go.draw(ctx));
 }
 
+function drawLife() {
+  // TODO, 35, 27
+  const START_POS = canvas.width - 180;
+  for (let i = 0; i < hero.life; i++) {
+    ctx.drawImage(lifeImg, START_POS + 45 * (i + 1), canvas.height - 37);
+  }
+}
+
+function drawPoints() {
+  ctx.font = "30px Arial";
+  ctx.fillStyle = "red";
+  ctx.textAlign = "left";
+  drawText("Points: " + hero.points, 10, canvas.height - 20);
+}
+
+function drawText(message, x, y) {
+  ctx.fillText(message, x, y);
+}
+
 //Implement collision rules for the laser
 function updateGameObjects() {
   const enemies = gameObjects.filter((go) => go.type === "Enemy");
   const lasers = gameObjects.filter((go) => go.type === "Laser");
+  const hero = gameObjects.filter((go) => go.type === "Hero");
   //laser hit something
   lasers.forEach((l) => {
     enemies.forEach((m) => {
@@ -217,10 +253,18 @@ function updateGameObjects() {
       }
     });
   });
+  //hero hit enemies
+  enemies.forEach((enemy) => {
+    const heroRect = hero[0].rectFromGameObject();
+    if (intersectRect(enemy.rectFromGameObject(), heroRect)) {
+      eventEmitter.emit(Messages.COLLISION_ENEMY_HERO, { enemy });
+    }
+  });
 
   gameObjects = gameObjects.filter((go) => !go.dead);
 }
 
+//init game
 function initGame() {
   gameObjects = [];
   createEnemies();
@@ -243,12 +287,20 @@ function initGame() {
   });
 
   eventEmitter.on(Messages.KEY_EVENT_SPACE, () => {
-    hero.fire();
+    if (hero.canFire()) {
+      hero.fire();
+    }
   });
 
   eventEmitter.on(Messages.COLLISION_ENEMY_LASER, (_, { first, second }) => {
     first.dead = true;
     second.dead = true;
+    hero.incrementPoints();
+  });
+
+  eventEmitter.on(Messages.COLLISION_ENEMY_HERO, (_, { enemy }) => {
+    enemy.dead = true;
+    hero.decrementLife();
   });
 }
 
@@ -258,6 +310,7 @@ window.onload = async () => {
   heroImg = await loadTexture("./assets/player.png");
   enemyImg = await loadTexture("./assets/enemyShip.png");
   laserImg = await loadTexture("./assets/laserRed.png");
+  lifeImg = await loadTexture("./assets/life.png");
 
   initGame();
   let gameLoopId = setInterval(() => {
@@ -266,5 +319,7 @@ window.onload = async () => {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     drawGameObjects(ctx);
     updateGameObjects();
+    drawPoints();
+    drawLife();
   }, 50);
 };
