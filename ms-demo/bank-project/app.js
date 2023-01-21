@@ -1,11 +1,42 @@
 //npx lite-server to active server to run single-app
 
-let account = null;
+let state = Object.freeze({
+  account: null,
+});
+
+const storageKey = "savedAccount";
 
 //navigate path
 function navigate(path) {
   window.history.pushState({}, path, path);
   updateRoute();
+}
+
+async function updateAccountData() {
+  const account = state.account;
+  if (!account) {
+    return logout();
+  }
+
+  const data = await getAccount(account.user);
+  if (data.error) {
+    return logout();
+  }
+
+  updateState("account", data);
+}
+
+async function refresh() {
+  await updateAccountData();
+  updateDashboard();
+}
+
+function updateState(property, newData) {
+  state = Object.freeze({
+    ...state,
+    [property]: newData,
+  });
+  localStorage.setItem(storageKey, JSON.stringify(state.account));
 }
 
 function updateElement(id, textOrNode) {
@@ -25,8 +56,9 @@ function createTransationRow(transaction) {
 }
 
 function updateDashboard() {
+  const account = state.account;
   if (!account) {
-    return navigate("/login");
+    return logout();
   }
 
   updateElement("description", account.description);
@@ -40,10 +72,16 @@ function updateDashboard() {
   }
   updateElement("transactions", transactionsRows);
 }
+
+function logout() {
+  updateState("account", null);
+  navigate("/login");
+}
+
 //routes
 const routes = {
   "/login": { templateId: "login" },
-  "/dashboard": { templateId: "dashboard", init: updateDashboard },
+  "/dashboard": { templateId: "dashboard", init: refresh },
 };
 
 //according to routes to update content
@@ -51,7 +89,7 @@ function updateRoute() {
   const path = window.location.pathname;
   const route = routes[path];
   if (!route) {
-    return navigate("login");
+    return navigate("/dashboard");
   }
 
   const template = document.getElementById(route.templateId);
@@ -87,7 +125,7 @@ async function register() {
   }
 
   console.log("Account created!", result);
-  account = result;
+  updateState("account", result);
   navigate("/dashboard");
 }
 
@@ -114,7 +152,7 @@ async function login() {
     return updateElement("loginError", data.error);
   }
 
-  account = data;
+  updateState("account", data);
   navigate("/dashboard");
 }
 
@@ -129,6 +167,18 @@ async function getAccount(user) {
   }
 }
 
-window.onpopstate = () => updateRoute();
-updateRoute();
+//window.onpopstate = () => updateRoute();
+//updateRoute();
 //updateRoute("login");
+
+function init() {
+  const savedAccount = localStorage.getItem(storageKey);
+  if (savedAccount) {
+    updateState("account", JSON.parse(savedAccount));
+  }
+
+  window.onpopstate = () => updateRoute();
+  updateRoute();
+}
+
+init();
